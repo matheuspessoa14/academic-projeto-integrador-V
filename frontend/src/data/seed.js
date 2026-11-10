@@ -1,0 +1,138 @@
+export const initialUsers = [
+  {
+    id: "U001",
+    nome: "Anna Mitchell",
+    email: "anna@lumera.demo",
+    perfil: "Administrador",
+    ativo: true,
+    telefone: "(21) 99999-1122",
+    iniciais: "AM",
+  },
+  {
+    id: "U002",
+    nome: "Isabela Cooper",
+    email: "isabela@lumera.demo",
+    perfil: "Médico",
+    ativo: true,
+    telefone: "(21) 99999-2233",
+    iniciais: "IC",
+  },
+  {
+    id: "U003",
+    nome: "Carlos Almeida",
+    email: "carlos@lumera.demo",
+    perfil: "Médico",
+    ativo: true,
+    telefone: "(21) 99999-3344",
+    iniciais: "CA",
+  },
+  {
+    id: "U004",
+    nome: "Mariana Souza",
+    email: "mariana@lumera.demo",
+    perfil: "Paciente",
+    ativo: true,
+    telefone: "(21) 99999-4455",
+    iniciais: "MS",
+  },
+  {
+    id: "U005",
+    nome: "Pedro Costa",
+    email: "pedro@lumera.demo",
+    perfil: "Paciente",
+    ativo: true,
+    telefone: "(21) 99999-5566",
+    iniciais: "PC",
+  },
+  {
+    id: "U006",
+    nome: "Camila Pereira",
+    email: "camila@lumera.demo",
+    perfil: "Recepcionista",
+    ativo: true,
+    telefone: "(21) 99999-6677",
+    iniciais: "CP",
+  },
+];
+const tomorrow = (offset) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+export const initialAppointments = [
+  {
+    id: "AG001",
+    paciente: "Mariana Souza",
+    medico: "Isabela Cooper",
+    especialidade: "Dermatologia",
+    data: tomorrow(0),
+    hora: "09:00",
+    status: "Confirmada",
+  },
+  {
+    id: "AG002",
+    paciente: "Pedro Costa",
+    medico: "Carlos Almeida",
+    especialidade: "Clínica geral",
+    data: tomorrow(0),
+    hora: "10:30",
+    status: "Em andamento",
+  },
+  {
+    id: "AG003",
+    paciente: "João Ferreira",
+    medico: "Isabela Cooper",
+    especialidade: "Dermatologia",
+    data: tomorrow(1),
+    hora: "14:00",
+    status: "Pendente",
+  },
+  {
+    id: "AG004",
+    paciente: "Luciana Martins",
+    medico: "Carlos Almeida",
+    especialidade: "Clínica geral",
+    data: tomorrow(2),
+    hora: "11:00",
+    status: "Confirmada",
+  },
+  {
+    id: "AG005",
+    paciente: "Ana Paula Lima",
+    medico: "Carlos Almeida",
+    especialidade: "Clínica geral",
+    data: tomorrow(-1),
+    hora: "08:30",
+    status: "Concluída",
+  },
+];
+export const initialRecords = [
+  {
+    id: "PR001",
+    paciente: "Mariana Souza",
+    medico: "Isabela Cooper",
+    data: tomorrow(-8),
+    tipo: "Consulta de rotina",
+    observacoes:
+      "Atendimento demonstrativo. Paciente apresentou boas condições gerais.",
+    status: "Finalizado",
+  },
+  {
+    id: "PR002",
+    paciente: "Pedro Costa",
+    medico: "Carlos Almeida",
+    data: tomorrow(-4),
+    tipo: "Acompanhamento",
+    observacoes: "Registro fictício para apresentação acadêmica.",
+    status: "Finalizado",
+  },
+  {
+    id: "PR003",
+    paciente: "João Ferreira",
+    medico: "Isabela Cooper",
+    data: tomorrow(-1),
+    tipo: "Avaliação inicial",
+    observacoes: "Exemplo de observação clínica sem dados reais.",
+    status: "Em análise",
+  },
+];
