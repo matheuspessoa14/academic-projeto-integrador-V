@@ -43,7 +43,7 @@ export default function DashboardLayout() {
           </div>
           <div className="top-actions">
             <span className="demo-tag">
-              <Sparkles size={13} /> Modo demonstração
+              <Sparkles size={13} /> Autenticado · Dados de exemplo
             </span>
             <button
               type="button"
@@ -60,7 +60,7 @@ export default function DashboardLayout() {
               </div>
               <div className="profile-meta">
                 <strong>{session?.nome}</strong>
-                <small>{session?.perfil || "Administrador"}</small>
+                <small>{({ ADMINISTRADOR: "Administrador", PROFISSIONAL_SAUDE: "Profissional de saúde", RECEPCAO: "Recepção" }[session?.perfil] || session?.perfil || "Usuário")}</small>
               </div>
               <ChevronDown size={15} />
             </div>
