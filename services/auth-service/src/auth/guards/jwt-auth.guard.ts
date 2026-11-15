@@ -1,4 +1,3 @@
-
 import {
   CanActivate,
   ExecutionContext,
@@ -9,9 +8,10 @@ import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 
 export interface JwtPayload {
-  sub: number;
+  sub: string;
   email: string;
   role: string;
+  tenantId?: string;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -22,36 +22,27 @@ export interface AuthenticatedRequest extends Request {
 export class JwtAuthGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
 
-  async canActivate(
-    context: ExecutionContext,
-  ): Promise<boolean> {
-    const request = context
-      .switchToHttp()
-      .getRequest<AuthenticatedRequest>();
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     const authorization = request.headers.authorization;
 
     if (!authorization) {
-      throw new UnauthorizedException(
-        'Token de autenticação não informado.',
-      );
+      throw new UnauthorizedException('Token de autenticação não informado.');
     }
 
     const [tipo, token] = authorization.split(' ');
 
     if (tipo !== 'Bearer' || !token) {
-      throw new UnauthorizedException(
-        'Formato de token inválido.',
-      );
+      throw new UnauthorizedException('Formato de token inválido.');
     }
 
     try {
-      const payload =
-        await this.jwtService.verifyAsync<JwtPayload>(token);
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
 
       if (
-        !Number.isInteger(payload.sub) ||
-        payload.sub <= 0 ||
+        typeof payload.sub !== 'string' ||
+        !/^[1-9]\d*$/.test(payload.sub) ||
         typeof payload.email !== 'string' ||
         typeof payload.role !== 'string'
       ) {
@@ -62,9 +53,7 @@ export class JwtAuthGuard implements CanActivate {
 
       return true;
     } catch {
-      throw new UnauthorizedException(
-        'Token inválido ou expirado.',
-      );
+      throw new UnauthorizedException('Token inválido ou expirado.');
     }
   }
 }

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import Brand from "../components/Brand";
+
 function TinyDashboard() {
   return (
     <div className="login-preview">
@@ -73,14 +74,27 @@ export default function LoginPage() {
   const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
-  const submit = (e) => {
+  const [loading, setLoading] = useState(false);
+  const submit = async (e) => {
     e.preventDefault();
-    const result = login(email, password);
-    if (!result.ok) {
-      setError(result.message);
-      return;
+
+    if (loading) return;
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const result = await login(email, password, remember);
+
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+
+      navigate("/dashboard", { replace: true });
+    } finally {
+      setLoading(false);
     }
-    navigate("/dashboard", { replace: true });
   };
   return (
     <div className="login-screen">
@@ -140,24 +154,26 @@ export default function LoginPage() {
                 <span className="login-muted">Recuperação em breve</span>
               </div>
               {error && <p className="form-error">{error}</p>}
-              <button className="login-submit" type="submit">
-                Entrar na plataforma <ArrowRight size={18} />
+              <button className="login-submit" type="submit" disabled={loading}>
+                {loading ? "Autenticando..." : <>
+                  Entrar na plataforma <ArrowRight size={18} />
+                </>}
               </button>
             </form>
             <div className="demo-instructions">
               <span className="demo-dot" />
               <div>
-                <strong>Acesso demonstrativo</strong>
+                <strong>Área de acesso protegido</strong>
                 <p>
-                  Use um e-mail válido e qualquer senha não vazia para
-                  visualizar o frontend. Não há autenticação real nesta versão.
+                  Utilize suas credenciais de acesso. Os dados clínicos exibidos
+                  após o login ainda são demonstrativos.
                 </p>
               </div>
             </div>
           </div>
           <p className="login-footer">
-            © {new Date().getFullYear()} Lumera · Projeto acadêmico · Ambiente
-            fictício
+            © {new Date().getFullYear()} Lumera · Projeto acadêmico · Dados clínicos
+            demonstrativos
           </p>
         </section>
         <section className="login-showcase">

@@ -6,12 +6,14 @@ import DashboardPage from "./pages/DashboardPage";
 import UsuariosPage from "./pages/UsuariosPage";
 import AgendamentosPage from "./pages/AgendamentosPage";
 import ProntuariosPage from "./pages/ProntuariosPage";
-function RequireDemo({ children }) {
-  const { session } = useApp();
+function RequireAuth({ children }) {
+  const { session, authLoading } = useApp();
+  if (authLoading) return <div className="auth-loading">Verificando sessão...</div>;
   return session ? children : <Navigate to="/login" replace />;
 }
 export default function App() {
-  const { session } = useApp();
+  const { session, authLoading } = useApp();
+  if (authLoading) return <div className="auth-loading">Carregando Lumera...</div>;
   return (
     <Routes>
       <Route
@@ -21,9 +23,9 @@ export default function App() {
       <Route
         path="/"
         element={
-          <RequireDemo>
+          <RequireAuth>
             <DashboardLayout />
-          </RequireDemo>
+          </RequireAuth>
         }
       >
         <Route index element={<Navigate to="/dashboard" replace />} />

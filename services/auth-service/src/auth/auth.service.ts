@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+
 import { JwtService } from '@nestjs/jwt';
 
 import { UsersService } from '../users/users.service.js';
@@ -10,10 +11,11 @@ import { verificarSenha } from './password.utils.js';
 import { LoginDto } from './dto/login.dto.js';
 
 interface UsuarioAutenticado {
-  id: number;
+  id: string;
   nome: string;
   email: string;
   role: string;
+  tenantId?: string;
 }
 
 @Injectable()
@@ -24,23 +26,20 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto) {
-    // Busca o usuário pelo e-mail informado
     const usuario =
       await this.usersService.buscarPorEmailComSenha(
         dto.email,
       );
 
-    // Verifica se o usuário existe e está ativo
     if (!usuario || !usuario.ativo) {
       throw new UnauthorizedException(
         'E-mail ou senha inválidos.',
       );
     }
 
-    // Compara a senha digitada com o hash armazenado
     const senhaValida = await verificarSenha(
       dto.senha,
-      usuario.senha,
+      usuario.senhaHash,
     );
 
     if (!senhaValida) {
@@ -49,12 +48,12 @@ export class AuthService {
       );
     }
 
-    // Gera o token após autenticar as credenciais
     return this.gerarToken({
-      id: usuario.id,
+      id: usuario.id.toString(),
       nome: usuario.nome,
       email: usuario.email,
-      role: usuario.role ?? 'paciente',
+      role: usuario.perfil.codigo,
+      tenantId: usuario.tenantId,
     });
   }
 
@@ -63,6 +62,9 @@ export class AuthService {
       sub: usuario.id,
       email: usuario.email,
       role: usuario.role,
+      ...(usuario.tenantId
+        ? { tenantId: usuario.tenantId }
+        : {}),
     };
 
     const accessToken =

@@ -4,7 +4,6 @@ import {
   CalendarDays,
   UsersRound,
   ClipboardList,
-  Settings2,
   X,
   HeartHandshake,
   LogOut,
@@ -70,14 +69,14 @@ export default function Sidebar({ open, onClose }) {
           <div className="sidebar-divider" />
           <div className="sidebar-footnote">
             <ShieldCheck size={17} />
-            <span>Ambiente de demonstração</span>
+            <span>Acesso autenticado · Dados de demonstração</span>
           </div>
           <button
             type="button"
             onClick={logout}
             className="sidebar-link sidebar-logout"
           >
-            <LogOut size={18} /> Sair da demonstração
+            <LogOut size={18} /> Sair da plataforma
           </button>
         </div>
       </aside>

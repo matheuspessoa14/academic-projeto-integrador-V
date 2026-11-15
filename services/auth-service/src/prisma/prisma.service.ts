@@ -11,25 +11,38 @@ export class PrismaService
   implements OnModuleDestroy
 {
   constructor(config: ConfigService) {
-    const databaseUrl =
-      config.get<string>('DATABASE_URL');
+    const databaseUrl = config.get<string>('DATABASE_URL');
 
-    if (
-      !databaseUrl ||
-      databaseUrl.includes('USUARIO:SENHA@HOST')
-    ) {
+    if (!databaseUrl) {
       throw new Error(
         'Configure uma DATABASE_URL válida antes de usar o PrismaService.',
       );
     }
 
-    const driverUrl = databaseUrl.replace(
-      /^mysql:\/\//,
-      'mariadb://',
-    );
+    const url = new URL(databaseUrl);
+
+    const adapter = new PrismaMariaDb({
+      host: url.hostname,
+      port: Number(url.port || 3306),
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      database: url.pathname.replace(/^\/+/, ''),
+
+      // Tempo máximo para estabelecer uma conexão
+      connectTimeout: 10_000,
+
+      // Tempo máximo aguardando uma conexão disponível
+      acquireTimeout: 20_000,
+
+      // Limite reduzido para o banco compartilhado do SENAC
+      connectionLimit: 3,
+
+      // Tempo de inatividade em segundos
+      idleTimeout: 300,
+    });
 
     super({
-      adapter: new PrismaMariaDb(driverUrl),
+      adapter,
     });
   }
 

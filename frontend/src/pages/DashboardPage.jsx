@@ -107,7 +107,7 @@ export default function DashboardPage() {
           icon={UsersRound}
           title="Usuários cadastrados"
           value={users.length}
-          sub="Perfis no sistema"
+          sub="Contas da equipe no MySQL"
           color="blue"
         />
         <Metric
