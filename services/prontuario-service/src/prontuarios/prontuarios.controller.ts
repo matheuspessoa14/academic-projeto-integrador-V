@@ -5,10 +5,14 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ProntuariosService } from './prontuarios.service.js';
 import { CreateProntuarioDto } from './dto/create-prontuario.dto.js';
+import { UpdateProntuarioDto } from './dto/update-prontuario.dto.js';
+import { ListarProntuariosDto } from './dto/listar-prontuarios.dto.js';
 
 @Controller('prontuarios')
 export class ProntuariosController {
@@ -17,8 +21,13 @@ export class ProntuariosController {
   ) {}
 
   @Get()
-  listar() {
-    return this.prontuariosService.listar();
+  listar(@Query() filtros: ListarProntuariosDto) {
+    return this.prontuariosService.listar(filtros);
+  }
+
+  @Get('estatisticas')
+  obterEstatisticas() {
+    return this.prontuariosService.obterEstatisticas();
   }
 
   @Get(':id')
@@ -29,5 +38,13 @@ export class ProntuariosController {
   @Post()
   criar(@Body() dto: CreateProntuarioDto) {
     return this.prontuariosService.criar(dto);
+  }
+
+  @Patch(':id')
+  atualizar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateProntuarioDto,
+  ) {
+    return this.prontuariosService.atualizar(id, dto);
   }
 }
