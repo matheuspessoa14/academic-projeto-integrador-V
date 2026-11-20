@@ -1,0 +1,69 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Agenda {
+  id               String            @id @db.Char(36)
+  clinicaId        String            @map("clinica_id") @db.Char(36)
+  profissionalId   String            @map("profissional_id") @db.Char(36)
+  ativa            Boolean           @default(true)
+  agendamentos     Agendamento[]
+  bloqueios        Bloqueio[]
+  disponibilidades Disponibilidade[]
+
+  @@index([clinicaId], map: "idx_agenda_clinica")
+  @@index([profissionalId], map: "idx_agenda_profissional")
+  @@map("agd_agenda")
+}
+
+model Agendamento {
+  id         String   @id @db.Char(36)
+  agendaId   String   @map("agenda_id") @db.Char(36)
+  pacienteId String   @map("paciente_id") @db.Char(36)
+  unidadeId  String   @map("unidade_id") @db.Char(36)
+  servicoId  String   @map("servico_id") @db.Char(36)
+  inicio     DateTime @db.DateTime(0)
+  fim        DateTime @db.DateTime(0)
+  status     String   @db.VarChar(30)
+  agenda     Agenda   @relation(fields: [agendaId], references: [id], onUpdate: Restrict, map: "fk_agd_agenda")
+
+  @@index([agendaId], map: "idx_agd_agenda")
+  @@index([pacienteId], map: "idx_agd_paciente")
+  @@index([inicio, fim], map: "idx_agd_periodo")
+  @@index([status], map: "idx_agd_status")
+  @@map("agd_agendamento")
+}
+
+model Bloqueio {
+  id       String   @id @db.Char(36)
+  agendaId String   @map("agenda_id") @db.Char(36)
+  inicio   DateTime @db.DateTime(0)
+  fim      DateTime @db.DateTime(0)
+  motivo   String   @db.VarChar(255)
+  agenda   Agenda   @relation(fields: [agendaId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_bloq_agenda")
+
+  @@index([agendaId], map: "idx_bloq_agenda")
+  @@index([inicio, fim], map: "idx_bloq_periodo")
+  @@map("agd_bloqueio")
+}
+
+model Disponibilidade {
+  id        String   @id @db.Char(36)
+  agendaId  String   @map("agenda_id") @db.Char(36)
+  unidadeId String   @map("unidade_id") @db.Char(36)
+  servicoId String   @map("servico_id") @db.Char(36)
+  inicio    DateTime @db.DateTime(0)
+  fim       DateTime @db.DateTime(0)
+  agenda    Agenda   @relation(fields: [agendaId], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_disp_agenda")
+
+  @@index([agendaId], map: "idx_disp_agenda")
+  @@index([inicio, fim], map: "idx_disp_periodo")
+  @@map("agd_disponibilidade")
+}
