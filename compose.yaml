@@ -23,6 +23,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: "3000"
+      TENANT_ID: "00000000-0000-4000-8000-000000000001"
     restart: "no"
 
   gateway:
