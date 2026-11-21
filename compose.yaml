@@ -35,3 +35,40 @@ services:
       - auth-service
       - appointment-service
     restart: "no"
+
+  postgres-prontuario:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: lumera_prontuario
+      POSTGRES_PASSWORD: ${PRONTUARIO_DB_PASSWORD:?Senha nao definida}
+      POSTGRES_DB: lumera_prontuario_dev
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - prontuario_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  prontuario-service:
+    build:
+      context: ./services/prontuario-service
+    image: lumera-prontuario-service:dev
+    ports:
+      - "3003:3000"
+    env_file:
+      - .env.compose
+    environment:
+      TENANT_ID: "00000000-0000-4000-8000-000000000001"
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: "postgresql://lumera_prontuario:${PRONTUARIO_DB_PASSWORD}@postgres-prontuario:5432/lumera_prontuario_dev?schema=public"
+    depends_on:
+      postgres-prontuario:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  prontuario_pgdata:

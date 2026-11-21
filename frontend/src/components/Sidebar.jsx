@@ -14,11 +14,11 @@ import { useApp } from "../context/AppContext";
 const menu = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/agendamentos", label: "Agendamentos", icon: CalendarDays },
-  { to: "/usuarios", label: "Usuários e pacientes", icon: UsersRound },
+  { to: "/usuarios", label: "Usuários da equipe", icon: UsersRound },
   { to: "/prontuarios", label: "Prontuários", icon: ClipboardList },
 ];
 export default function Sidebar({ open, onClose }) {
-  const { logout } = useApp();
+  const { logout, session } = useApp();
   return (
     <>
       {open && (
@@ -43,7 +43,7 @@ export default function Sidebar({ open, onClose }) {
         </div>
         <div className="sidebar-section-label">MENU PRINCIPAL</div>
         <nav className="sidebar-nav" aria-label="Navegação principal">
-          {menu.map(({ to, label, icon: Icon }) => (
+          {menu.filter(item => (item.to !== '/usuarios' || session?.perfil === 'ADMINISTRADOR') && (item.to !== '/prontuarios' || ['ADMINISTRADOR','PROFISSIONAL_SAUDE'].includes(session?.perfil))).map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

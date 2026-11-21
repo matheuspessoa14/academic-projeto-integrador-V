@@ -6,6 +6,8 @@ import {
   IsString,
   MaxLength,
   MinLength,
+  IsOptional,
+  IsIn,
 } from 'class-validator';
 
 export class CreateUserDto {
@@ -40,4 +42,8 @@ export class CreateUserDto {
   })
   @MaxLength(72)
   senha!: string;
+  @ApiProperty({ example: 'PROFISSIONAL_SAUDE', required: false, enum: ['ADMINISTRADOR', 'PROFISSIONAL_SAUDE', 'RECEPCAO'] })
+  @IsOptional()
+  @IsIn(['ADMINISTRADOR', 'PROFISSIONAL_SAUDE', 'RECEPCAO'])
+  role?: 'ADMINISTRADOR' | 'PROFISSIONAL_SAUDE' | 'RECEPCAO';
 }

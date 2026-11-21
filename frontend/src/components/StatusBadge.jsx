@@ -1,6 +1,7 @@
 export default function StatusBadge({ value }) {
   const map = {
     Confirmada: "positive",
+    Agendado: "info",
     Concluída: "positive",
     Finalizado: "positive",
     Ativo: "positive",

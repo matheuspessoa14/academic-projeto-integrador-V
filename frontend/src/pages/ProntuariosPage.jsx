@@ -21,7 +21,10 @@ const empty = {
   observacoes: "",
 };
 export default function ProntuariosPage() {
-  const { records, users, createRecord, updateRecord } = useApp();
+  // LUMERA_REAL_PRONTUARIOS_V1
+  const { records, users, createRecord, updateRecord, recordsLoading, recordsError, professionals, professionalsLoading, professionalsError } = useApp();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [q, setQ] = useState("");
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState(null);
@@ -38,19 +41,28 @@ export default function ProntuariosPage() {
   );
   const openNew = () => {
     setEdit(null);
+    setSaveError("");
     setForm({ ...empty });
     setModal(true);
   };
   const openEdit = (r) => {
     setEdit(r.id);
+    setSaveError("");
     setForm({ ...r });
     setModal(true);
   };
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
-    if (edit) updateRecord(edit, form);
-    else createRecord(form);
-    setModal(false);
+    if (saving) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const result = edit ? await updateRecord(edit, form) : await createRecord(form);
+      if (result.ok) setModal(false);
+      else setSaveError(result.message || "Nao foi possivel salvar o prontuario.");
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <div className="module-page">
@@ -71,8 +83,8 @@ export default function ProntuariosPage() {
         <div>
           <strong>Dados fictícios, ambiente de aprendizado</strong>
           <p>
-            Esta versão não armazena informações clínicas reais. No backend,
-            acesso e permissões precisarão ser controlados pelo servidor.
+            Use apenas dados fictícios. Os registros de teste são armazenados
+            no PostgreSQL e a API exige autenticação.
           </p>
         </div>
       </div>
@@ -107,7 +119,7 @@ export default function ProntuariosPage() {
         <div className="panel-heading">
           <div>
             <h3>Histórico de atendimentos</h3>
-            <p>Consulte os prontuários demonstrativos</p>
+            <p>Consulte os prontuários cadastrados no PostgreSQL</p>
           </div>
         </div>
         <div className="filterbar">
@@ -120,7 +132,8 @@ export default function ProntuariosPage() {
             />
           </div>
         </div>
-        {filtered.length ? (
+        {recordsError && <p role="alert" style={{ color: "#b42318", margin: "12px 0" }}>{recordsError}</p>}
+        {recordsLoading ? <p>Carregando prontuários...</p> : filtered.length ? (
           <div className="table-scroll">
             <table className="data-table">
               <thead>
@@ -202,7 +215,7 @@ export default function ProntuariosPage() {
               <StatusBadge value={view.status} />
             </div>
             <div className="record-observations">
-              <span>Observações demonstrativas</span>
+              <span>Observações do atendimento fictício</span>
               <p>{view.observacoes}</p>
             </div>
           </div>
@@ -224,6 +237,7 @@ export default function ProntuariosPage() {
           onClose={() => setModal(false)}
         >
           <form className="modal-form" onSubmit={save}>
+            {saveError && <p role="alert" style={{ color: "#b42318" }}>{saveError}</p>}
             <label>
               Paciente
               <input
@@ -235,7 +249,7 @@ export default function ProntuariosPage() {
               />
               <datalist id="record-patients">
                 {users
-                  .filter((u) => u.perfil === "Paciente")
+                  .filter((u) => u.role === "PACIENTE")
                   .map((u) => (
                     <option key={u.id} value={u.nome} />
                   ))}
@@ -244,19 +258,22 @@ export default function ProntuariosPage() {
             <div className="form-row">
               <label>
                 Profissional
-                <input
-                  required
-                  list="record-doctors"
-                  value={form.medico}
-                  onChange={(e) => setForm({ ...form, medico: e.target.value })}
-                />
-                <datalist id="record-doctors">
-                  {users
-                    .filter((u) => u.perfil === "Médico")
-                    .map((u) => (
-                      <option key={u.id} value={u.nome} />
-                    ))}
-                </datalist>
+                <select
+                required
+                value={form.medico}
+                onChange={(e) => setForm({ ...form, medico: e.target.value })}
+                disabled={professionalsLoading}
+              >
+                <option value="">Selecione um profissional cadastrado</option>
+                {form.medico && !professionals.some(p => p.nome === form.medico) && (
+                  <option value={form.medico}>{form.medico} (registro anterior)</option>
+                )}
+                {professionals.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+              </select>
+              {professionalsError && <small className="form-error">{professionalsError}</small>}
+              {!professionalsLoading && !professionalsError && professionals.length === 0 && (
+                <small>Cadastre ou habilite um usuario do perfil Profissional de Saude na tela Usuarios.</small>
+              )}
               </label>
               <label>
                 Data
@@ -309,8 +326,8 @@ export default function ProntuariosPage() {
               >
                 Cancelar
               </button>
-              <button type="submit" className="primary-button">
-                Salvar prontuário
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? "Salvando..." : "Salvar prontuário"}
               </button>
             </div>
           </form>

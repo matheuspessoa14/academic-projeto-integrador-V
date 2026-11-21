@@ -4,6 +4,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Param,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -17,6 +19,7 @@ import {
 
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 
 import type {
@@ -56,6 +59,23 @@ export class UsersController {
     );
 
     return this.usersService.listar();
+  }
+
+  // LUMERA_GESTAO_V2 - endpoint acessivel aos membros ativos do tenant.
+  @Get('profissionais')
+  async profissionais(@Req() request: AuthenticatedRequest) {
+    await this.usersService.verificarMembro(request.user);
+    return this.usersService.listarProfissionais();
+  }
+
+  @Patch(':id')
+  async atualizar(
+    @Req() request: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    await this.usersService.verificarAdministrador(request.user);
+    return this.usersService.atualizar(id, dto, request.user!.sub);
   }
 
   @Post()

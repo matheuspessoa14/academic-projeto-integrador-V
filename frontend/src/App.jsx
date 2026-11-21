@@ -30,9 +30,9 @@ export default function App() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="usuarios" element={<UsuariosPage />} />
+        <Route path="usuarios" element={session?.perfil === 'ADMINISTRADOR' ? <UsuariosPage/> : <Navigate to="/dashboard" replace/>} />
         <Route path="agendamentos" element={<AgendamentosPage />} />
-        <Route path="prontuarios" element={<ProntuariosPage />} />
+        <Route path="prontuarios" element={['ADMINISTRADOR','PROFISSIONAL_SAUDE'].includes(session?.perfil) ? <ProntuariosPage/> : <Navigate to="/dashboard" replace/>} />
       </Route>
       <Route
         path="*"

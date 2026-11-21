@@ -5,10 +5,6 @@ import {
   useState,
 } from "react";
 
-import {
-  initialAppointments,
-  initialRecords,
-} from "../data/seed";
 
 const AppContext = createContext(null);
 
@@ -28,6 +24,34 @@ function read(key, fallback) {
 const nextId = (prefix) =>
   `${prefix}${Date.now().toString(36).toUpperCase()}`;
 
+const recordFromApi = (record) => ({
+  ...record,
+  data: String(record.data || "").slice(0, 10),
+  status: record.status === "FINALIZADO" ? "Finalizado" : "Em análise",
+});
+
+const recordToApi = (record, updating = false) => ({
+  paciente: String(record.paciente || "").trim(),
+  medico: String(record.medico || "").trim(),
+  data: String(record.data || "").slice(0, 10),
+  tipo: String(record.tipo || "").trim(),
+  observacoes: String(record.observacoes || "").trim(),
+  ...(updating ? { status: record.status === "Finalizado" ? "FINALIZADO" : "EM_ANALISE" } : {}),
+});
+
+// Os UUIDs fictícios são estáveis entre sessões para a demonstração.
+import { pacientesDemo } from '../data/pacientesDemo';
+const nomePacienteDemo = (id) => pacientesDemo.find(p => p.id === id)?.nome || ('Paciente ID ' + String(id).slice(0,8));
+const appointmentFromApi = (a) => ({
+  ...a,
+  paciente: nomePacienteDemo(a.pacienteId),
+  medico: 'Profissional da agenda',
+  especialidade: 'Atendimento clínico',
+  data: String(a.inicio || '').slice(0,10),
+  hora: String(a.inicio || '').slice(11,16),
+  status: a.status === 'CANCELADO' ? 'Cancelada' : 'Agendado',
+});
+
 export function AppProvider({ children }) {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -36,14 +60,22 @@ export function AppProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState("");
+  // LUMERA_GESTAO_V2
+  const [professionals, setProfessionals] = useState([]);
+  const [professionalsLoading, setProfessionalsLoading] = useState(false);
+  const [professionalsError, setProfessionalsError] = useState("");
 
-  const [appointments, setAppointments] = useState(() =>
-    read("lumera-appointments", initialAppointments)
-  );
+  // LUMERA_AGENDAMENTO_REAL_V1 — dados persistidos no MySQL via Gateway.
+  const [appointments, setAppointments] = useState([]);
+  const [agendas, setAgendas] = useState([]);
+  const [disponibilidades, setDisponibilidades] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState('');
 
-  const [records, setRecords] = useState(() =>
-    read("lumera-records", initialRecords)
-  );
+  // LUMERA_REAL_PRONTUARIOS_V1 - prontuarios carregados do PostgreSQL pela API.
+  const [records, setRecords] = useState([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  const [recordsError, setRecordsError] = useState("");
 
   const [toast, setToast] = useState("");
 
@@ -171,7 +203,7 @@ export function AppProvider({ children }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.accessToken}`,
         },
-        body: JSON.stringify({ nome, email, senha }),
+        body: JSON.stringify({ nome, email, senha, role: form.role || "RECEPCAO" }),
       });
 
       const result = await response.json().catch(() => ({}));
@@ -206,6 +238,26 @@ export function AppProvider({ children }) {
       return { ok: false, message: "Não foi possível conectar à API. Verifique o backend." };
     }
   };
+
+  const updateUser = async (id, form) => {
+    if (!session?.accessToken || session.perfil !== 'ADMINISTRADOR') {
+      return { ok: false, message: 'Apenas administradores podem editar usuarios.' };
+    }
+    try {
+      const response = await fetch(API_URL + '/users/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.accessToken },
+        body: JSON.stringify(form),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return { ok: false, message: Array.isArray(result.message) ? result.message.join(' ') : result.message || 'Nao foi possivel atualizar.' };
+      setUsers(previous => previous.map(u => u.id === result.id ? result : u));
+      notify('Usuario atualizado no MySQL.');
+      return { ok: true, usuario: result };
+    } catch { return { ok: false, message: 'Falha de conexao com Auth Service.' }; }
+  };
+
+  const toggleUserActive = async (id, ativo) => updateUser(id, { ativo });
 
   const logout = () => {
     clearStoredSession();
@@ -260,19 +312,107 @@ export function AppProvider({ children }) {
     return () => controller.abort();
   }, [session?.accessToken, session?.perfil]);
 
+  // Busca profissionais ativos mesmo para usuarios nao administradores.
   useEffect(() => {
-    localStorage.setItem(
-      "lumera-appointments",
-      JSON.stringify(appointments)
-    );
-  }, [appointments]);
+    const token = session?.accessToken;
+    if (!token) {
+      setProfessionals([]);
+      setProfessionalsError('');
+      setProfessionalsLoading(false);
+      return;
+    }
+    const abort = new AbortController();
+    setProfessionalsLoading(true);
+    setProfessionalsError('');
+    fetch(API_URL + '/users/profissionais', {
+      headers: { Authorization: 'Bearer ' + token }, signal: abort.signal,
+    }).then(async response => {
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(result)) throw new Error('Nao foi possivel consultar os profissionais cadastrados.');
+      return result;
+    }).then(result => { if (!abort.signal.aborted) setProfessionals(result); })
+      .catch(err => {
+        if (!abort.signal.aborted) {
+          setProfessionals([]);
+          setProfessionalsError(err.message);
+        }
+      }).finally(() => { if (!abort.signal.aborted) setProfessionalsLoading(false); });
+    return () => abort.abort();
+  }, [session?.accessToken, users]);
 
+  // Consulta agendas, disponibilidades e agendamentos reais após autenticação.
   useEffect(() => {
-    localStorage.setItem(
-      "lumera-records",
-      JSON.stringify(records)
-    );
-  }, [records]);
+    const token = session?.accessToken;
+    if (!token) {
+      setAppointments([]); setAgendas([]); setDisponibilidades([]);
+      setAppointmentsError(''); setAppointmentsLoading(false);
+      return;
+    }
+    const abort = new AbortController();
+    setAppointmentsLoading(true); setAppointmentsError('');
+    const headers = { Authorization: 'Bearer ' + token };
+    Promise.all(['/agendas', '/disponibilidades', '/agendamentos'].map(async rota => {
+      const response = await fetch(API_URL + rota, { headers, signal: abort.signal });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = Array.isArray(body?.message) ? body.message.join(' ') : body?.message;
+        throw new Error(response.status === 401 ? 'Sessão expirada. Entre novamente.' : message || 'Erro na API: ' + rota);
+      }
+      if (!Array.isArray(body)) throw new Error('Resposta inválida de ' + rota);
+      return body;
+    })).then(([a, d, c]) => {
+      if (abort.signal.aborted) return;
+      setAgendas(a); setDisponibilidades(d); setAppointments(c.map(appointmentFromApi));
+    }).catch(error => {
+      if (abort.signal.aborted) return;
+      setAgendas([]); setDisponibilidades([]); setAppointments([]);
+      setAppointmentsError(error.message || 'Erro ao carregar agendamentos.');
+    }).finally(() => { if (!abort.signal.aborted) setAppointmentsLoading(false); });
+    return () => abort.abort();
+  }, [session?.accessToken]);
+
+  // Consulta real dos prontuarios apos login; a API valida o token no servidor.
+  useEffect(() => {
+    const token = session?.accessToken;
+    if (!token || !['ADMINISTRADOR', 'PROFISSIONAL_SAUDE'].includes(session?.perfil)) {
+      setRecords([]);
+      setRecordsError("");
+      setRecordsLoading(false);
+      return;
+    }
+
+    const abort = new AbortController();
+    setRecordsLoading(true);
+    setRecordsError("");
+
+    fetch(`${API_URL}/prontuarios`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: abort.signal,
+    })
+      .then(async (response) => {
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          if (response.status === 401) throw new Error("Sessao expirada. Entre novamente.");
+          if (response.status === 403) throw new Error("Perfil sem permissao para consultar prontuarios.");
+          throw new Error("Nao foi possivel consultar os prontuarios.");
+        }
+        if (!Array.isArray(result)) throw new Error("Resposta inesperada da API.");
+        return result;
+      })
+      .then((result) => {
+        if (!abort.signal.aborted) setRecords(result.map(recordFromApi));
+      })
+      .catch((error) => {
+        if (abort.signal.aborted) return;
+        setRecords([]);
+        setRecordsError(error.message || "Erro ao carregar prontuarios.");
+      })
+      .finally(() => {
+        if (!abort.signal.aborted) setRecordsLoading(false);
+      });
+
+    return () => abort.abort();
+  }, [session?.accessToken, session?.perfil]);
 
   useEffect(() => {
     if (!toast) return;
@@ -284,38 +424,105 @@ export function AppProvider({ children }) {
 
   const notify = (message) => setToast(message);
 
-  const createAppointment = (data) => {
-    setAppointments((old) => [
-      { ...data, id: nextId("AG"), status: "Pendente" },
-      ...old,
-    ]);
-
-    notify("Agendamento criado no modo demonstração.");
+  // Cria e cancela agendamentos somente pelas rotas suportadas pelo backend.
+  const createAppointment = async (form) => {
+    if (!session?.accessToken) return { ok: false, message: 'Faça login novamente.' };
+    const disponivel = disponibilidades.find(d => d.id === form.disponibilidadeId);
+    if (!disponivel) return { ok: false, message: 'Selecione uma disponibilidade cadastrada.' };
+    if (!pacientesDemo.some(p => p.id === form.pacienteId)) return { ok: false, message: 'Selecione um paciente fictício.' };
+    // O MySQL DATETIME não armazena fuso: usamos UTC apenas como formato de transporte,
+    // preservando no banco e na tela a hora informada pela clínica.
+    const inicio = new Date(form.data + 'T' + form.hora + ':00.000Z');
+    const fim = new Date(inicio.getTime() + 30 * 60 * 1000);
+    if (Number.isNaN(inicio.getTime()) || inicio < new Date(disponivel.inicio) || fim > new Date(disponivel.fim)) {
+      return { ok: false, message: 'Escolha 30 minutos dentro da disponibilidade selecionada.' };
+    }
+    try {
+      const response = await fetch(API_URL + '/agendamentos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.accessToken },
+        body: JSON.stringify({
+          agendaId: disponivel.agendaId, pacienteId: form.pacienteId,
+          unidadeId: disponivel.unidadeId, servicoId: disponivel.servicoId,
+          inicio: inicio.toISOString(), fim: fim.toISOString(),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = Array.isArray(result.message) ? result.message.join(' ') : result.message;
+        return { ok: false, message: message || 'Falha ao cadastrar agendamento.' };
+      }
+      setAppointments(prev => [appointmentFromApi(result), ...prev]);
+      notify('Consulta registrada no MySQL.');
+      return { ok: true, agendamento: result };
+    } catch { return { ok: false, message: 'Falha na conexão com Appointment Service.' }; }
+  };
+  const cancelAppointment = async (id) => {
+    if (!session?.accessToken) return { ok: false, message: 'Faça login novamente.' };
+    try {
+      const response = await fetch(API_URL + '/agendamentos/' + encodeURIComponent(id) + '/cancelar', {
+        method: 'PATCH', headers: { Authorization: 'Bearer ' + session.accessToken },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = Array.isArray(result.message) ? result.message.join(' ') : result.message;
+        return { ok: false, message: message || 'Não foi possível cancelar.' };
+      }
+      setAppointments(prev => prev.map(a => a.id === id ? appointmentFromApi(result) : a));
+      notify('Agendamento cancelado no MySQL.');
+      return { ok: true };
+    } catch { return { ok: false, message: 'Falha ao conectar ao Appointment Service.' }; }
   };
 
-  const updateAppointment = (id, data) => {
-    setAppointments((old) =>
-      old.map((a) => (a.id === id ? { ...a, ...data } : a))
-    );
-
-    notify("Agendamento atualizado.");
+  // LUMERA_REAL_PRONTUARIOS_V1 - criacao e edicao persistidas no PostgreSQL.
+  const createRecord = async (data) => {
+    if (!session?.accessToken) return { ok: false, message: "Faca login novamente." };
+    try {
+      const response = await fetch(`${API_URL}/prontuarios`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+        body: JSON.stringify(recordToApi(data)),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = Array.isArray(result.message) ? result.message.join(" ")
+          : typeof result.message === "string" ? result.message : "Falha ao cadastrar prontuario.";
+        return { ok: false, message };
+      }
+      setRecords((previous) => [recordFromApi(result), ...previous]);
+      notify("Prontuario cadastrado no PostgreSQL.");
+      return { ok: true };
+    } catch {
+      return { ok: false, message: "Falha de conexao com a API de prontuarios." };
+    }
   };
 
-  const createRecord = (data) => {
-    setRecords((old) => [
-      { ...data, id: nextId("PR"), status: "Em análise" },
-      ...old,
-    ]);
-
-    notify("Prontuário criado no modo demonstração.");
-  };
-
-  const updateRecord = (id, data) => {
-    setRecords((old) =>
-      old.map((r) => (r.id === id ? { ...r, ...data } : r))
-    );
-
-    notify("Prontuário atualizado.");
+  const updateRecord = async (id, data) => {
+    if (!session?.accessToken) return { ok: false, message: "Faca login novamente." };
+    try {
+      const response = await fetch(`${API_URL}/prontuarios/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+        body: JSON.stringify(recordToApi(data, true)),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = Array.isArray(result.message) ? result.message.join(" ")
+          : typeof result.message === "string" ? result.message : "Falha ao atualizar prontuario.";
+        return { ok: false, message };
+      }
+      setRecords((previous) => previous.map((r) => r.id === id ? recordFromApi(result) : r));
+      notify("Prontuario atualizado no PostgreSQL.");
+      return { ok: true };
+    } catch {
+      return { ok: false, message: "Falha de conexao com a API de prontuarios." };
+    }
   };
 
   return (
@@ -327,12 +534,23 @@ export function AppProvider({ children }) {
         logout,
         users,
         createUser,
+        updateUser,
+        toggleUserActive,
+        professionals,
+        professionalsLoading,
+        professionalsError,
         usersLoading,
         usersError,
         appointments,
+        appointmentsLoading,
+        appointmentsError,
+        agendas,
+        disponibilidades,
         records,
+        recordsLoading,
+        recordsError,
         createAppointment,
-        updateAppointment,
+        cancelAppointment,
         createRecord,
         updateRecord,
         notify,

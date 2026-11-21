@@ -15,7 +15,13 @@ import {
 import { useApp } from "../context/AppContext";
 import StatusBadge from "../components/StatusBadge";
 import { brDate, todayISO, initials } from "../utils/format";
-const weekly = [38, 58, 46, 75, 62, 92, 71];
+// LUMERA_AGENDAMENTO_REAL_V1 — contagem real por dia da semana.
+const startWeek = () => {
+  const d = new Date(); d.setHours(12,0,0,0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
+};
+const dateAt = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 function Metric({ icon: Icon, title, value, sub, color }) {
   return (
     <div className="metric-card">
@@ -43,13 +49,13 @@ function Gauge({ count, completed }) {
       >
         <div className="gauge-inner">
           <strong>{percent}%</strong>
-          <span>concluídas</span>
+          <span>agendadas</span>
         </div>
       </div>
       <div className="gauge-legend">
         <span>
           <i className="legend-blue" />
-          Concluídas: {completed}
+          Agendadas: {completed}
         </span>
         <span>
           <i className="legend-pale" />
@@ -60,10 +66,18 @@ function Gauge({ count, completed }) {
   );
 }
 export default function DashboardPage() {
-  const { session, users, appointments, records } = useApp();
-  const completed = appointments.filter((a) => a.status === "Concluída").length;
+  const { session, users, professionals, appointments, records } = useApp();
+  const monday = startWeek();
+  const weeklyCounts = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday); d.setDate(monday.getDate()+i);
+    const date = dateAt(d);
+    return appointments.filter(a => a.data === date && a.status !== 'Cancelada').length;
+  });
+  const maxDaily = Math.max(1, ...weeklyCounts);
+  const weekly = weeklyCounts.map(n => Math.round(100*n/maxDaily));
+  const completed = appointments.filter((a) => a.status === 'Agendado').length;
   const today = appointments.filter((a) => a.data === todayISO()).length;
-  const recent = [...appointments]
+  const recent = appointments.filter(a => a.status !== 'Cancelada' && a.data >= todayISO())
     .sort((a, b) => a.data.localeCompare(b.data))
     .slice(0, 5);
   const first = (session?.nome || "").split(" ")[0];
@@ -106,7 +120,7 @@ export default function DashboardPage() {
         <Metric
           icon={UsersRound}
           title="Usuários cadastrados"
-          value={users.length}
+          value={session?.perfil === "ADMINISTRADOR" ? users.length : "—"}
           sub="Contas da equipe no MySQL"
           color="blue"
         />
@@ -114,14 +128,14 @@ export default function DashboardPage() {
           icon={CalendarDays}
           title="Consultas agendadas"
           value={appointments.length}
-          sub="Registros da demonstração"
+          sub="Consultas registradas no MySQL"
           color="purple"
         />
         <Metric
           icon={ClipboardList}
           title="Prontuários"
-          value={records.length}
-          sub="Históricos de atendimento"
+          value={session?.perfil === "RECEPCAO" ? "—" : records.length}
+          sub={session?.perfil === "RECEPCAO" ? "Acesso restrito" : "Registros no PostgreSQL"}
           color="aqua"
         />
         <Metric
@@ -137,7 +151,7 @@ export default function DashboardPage() {
           <div className="panel-heading">
             <div>
               <h3>Visão de atendimentos</h3>
-              <p>Distribuição ilustrativa da semana</p>
+              <p>Agendamentos por dia nesta semana</p>
             </div>
             <span className="subtle-pill">7 dias</span>
           </div>
@@ -153,10 +167,10 @@ export default function DashboardPage() {
           </div>
           <div className="chart-body">
             <div className="chart-y">
-              <span>100</span>
-              <span>75</span>
-              <span>50</span>
-              <span>25</span>
+              <span>{maxDaily}</span>
+              <span>{Math.round(maxDaily * 0.75)}</span>
+              <span>{Math.round(maxDaily * 0.5)}</span>
+              <span>{Math.round(maxDaily * 0.25)}</span>
               <span>0</span>
             </div>
             <div className="chart-main">
@@ -260,14 +274,13 @@ export default function DashboardPage() {
             <div>
               <small>PROFISSIONAIS</small>
               <strong>
-                {users.filter((u) => u.perfil === "Médico").length} médicos
+                {professionals.length} médicos
               </strong>
               <p>Disponíveis na base de demonstração</p>
             </div>
           </div>
           <div className="doctor-roster">
-            {users
-              .filter((u) => u.perfil === "Médico")
+            {professionals
               .slice(0, 3)
               .map((u) => (
                 <div className="doctor-row" key={u.id}>
@@ -282,9 +295,9 @@ export default function DashboardPage() {
                 </div>
               ))}
           </div>
-          <Link to="/usuarios" className="doctor-bottom-link">
-            Gerenciar usuários <ArrowRight size={15} />
-          </Link>
+          {session?.perfil === "ADMINISTRADOR" && (
+            <Link to="/usuarios" className="doctor-bottom-link">Gerenciar usuários <ArrowRight size={15} /></Link>
+          )}
         </section>
       </div>
       <p className="data-disclaimer">

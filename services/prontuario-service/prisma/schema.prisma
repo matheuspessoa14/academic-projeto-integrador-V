@@ -1,0 +1,29 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum StatusProntuario {
+  EM_ANALISE
+  FINALIZADO
+}
+
+model Prontuario {
+  id           Int              @id @default(autoincrement())
+  paciente     String           @db.VarChar(150)
+  medico       String           @db.VarChar(150)
+  data         DateTime         @db.Date
+  tipo         String           @db.VarChar(100)
+  observacoes  String           @db.Text
+  status       StatusProntuario @default(EM_ANALISE)
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("prontuarios")
+}
