@@ -55,7 +55,11 @@ export class JwtAuthGuard implements CanActivate {
         typeof payload.sub !== 'string' ||
         !/^[1-9]\d*$/.test(payload.sub) ||
         typeof payload.email !== 'string' ||
-        typeof payload.role !== 'string'
+        typeof payload.role !== 'string' ||
+        typeof payload.tenantId !== 'string' ||
+        !process.env.TENANT_ID ||
+        payload.tenantId !== process.env.TENANT_ID ||
+        !['ADMINISTRADOR', 'PROFISSIONAL_SAUDE', 'RECEPCAO'].includes(payload.role)
       ) {
         throw new Error('Payload inválido');
       }

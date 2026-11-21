@@ -21,9 +21,11 @@ export class DisponibilidadesService {
     agendaId?: string;
     unidadeId?: string;
     servicoId?: string;
+    tenantId?: string;
   }) {
     return this.prisma.disponibilidade.findMany({
       where: {
+        ...(filtros.tenantId && { agenda: { clinicaId: filtros.tenantId } }),
         ...(filtros.agendaId && {
           agendaId: filtros.agendaId,
         }),
@@ -40,11 +42,10 @@ export class DisponibilidadesService {
     });
   }
 
-  async buscarPorId(id: string) {
-    const disponibilidade =
-      await this.prisma.disponibilidade.findUnique({
-        where: { id },
-      });
+  async buscarPorId(id: string, tenantId?: string) {
+    const disponibilidade = tenantId
+      ? await this.prisma.disponibilidade.findFirst({ where: { id, agenda: { clinicaId: tenantId } } })
+      : await this.prisma.disponibilidade.findUnique({ where: { id } });
 
     if (!disponibilidade) {
       throw new NotFoundException(
@@ -55,7 +56,7 @@ export class DisponibilidadesService {
     return disponibilidade;
   }
 
-  async criar(dto: CriarDisponibilidadeDto) {
+  async criar(dto: CriarDisponibilidadeDto, tenantId?: string) {
     const inicio = new Date(dto.inicio);
     const fim = new Date(dto.fim);
 
@@ -99,6 +100,10 @@ export class DisponibilidadesService {
         throw new NotFoundException(
           'Agenda não encontrada ou inativa.',
         );
+      }
+
+      if (tenantId && agenda.clinicaId !== tenantId) {
+        throw new NotFoundException("Agenda não encontrada nesta clínica.");
       }
 
       // Verifica sobreposição para a mesma

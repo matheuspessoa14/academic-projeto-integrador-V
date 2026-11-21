@@ -17,9 +17,11 @@ export class AgendamentosService {
     pacienteId?: string;
     agendaId?: string;
     status?: string;
+    tenantId?: string;
   }) {
     return this.prisma.agendamento.findMany({
       where: {
+        ...(filtros.tenantId && { agenda: { clinicaId: filtros.tenantId } }),
         ...(filtros.pacienteId && {
           pacienteId: filtros.pacienteId,
         }),
@@ -36,10 +38,10 @@ export class AgendamentosService {
     });
   }
 
-  async buscarPorId(id: string) {
-    const agendamento = await this.prisma.agendamento.findUnique({
-      where: { id },
-    });
+  async buscarPorId(id: string, tenantId?: string) {
+    const agendamento = tenantId
+      ? await this.prisma.agendamento.findFirst({ where: { id, agenda: { clinicaId: tenantId } } })
+      : await this.prisma.agendamento.findUnique({ where: { id } });
 
     if (!agendamento) {
       throw new NotFoundException("Agendamento não encontrado.");
@@ -48,7 +50,7 @@ export class AgendamentosService {
     return agendamento;
   }
 
-  async criar(dto: CriarAgendamentoDto) {
+  async criar(dto: CriarAgendamentoDto, tenantId?: string) {
     const inicio = new Date(dto.inicio);
     const fim = new Date(dto.fim);
 
@@ -79,6 +81,10 @@ export class AgendamentosService {
 
       if (!agenda || !agenda.ativa) {
         throw new NotFoundException("Agenda não encontrada ou inativa.");
+      }
+
+      if (tenantId && agenda.clinicaId !== tenantId) {
+        throw new NotFoundException("Agenda não encontrada nesta clínica.");
       }
 
       // Verifica se o horário está disponível.
@@ -141,7 +147,7 @@ export class AgendamentosService {
     });
   }
 
-  async cancelar(id: string) {
+  async cancelar(id: string, tenantId?: string) {
     // Busca inicialmente o agendamento para identificar sua agenda.
     const existente = await this.prisma.agendamento.findUnique({
       where: { id },
@@ -163,6 +169,13 @@ export class AgendamentosService {
 
       if (agendas.length === 0) {
         throw new NotFoundException("Agenda não encontrada.");
+      }
+
+      if (tenantId) {
+        const agendaDaClinica = await tx.agenda.findUnique({ where: { id: existente.agendaId } });
+        if (!agendaDaClinica || agendaDaClinica.clinicaId !== tenantId) {
+          throw new NotFoundException("Agendamento não encontrado nesta clínica.");
+        }
       }
 
       // Consulta novamente após adquirir o bloqueio.

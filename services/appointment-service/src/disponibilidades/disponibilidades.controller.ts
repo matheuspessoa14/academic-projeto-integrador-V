@@ -1,5 +1,8 @@
+import type { AuthenticatedRequest } from '../auth/guards/jwt-auth.guard.js';
 
 import {
+  Req,
+  ForbiddenException,
   Controller,
   Get,
   Post,
@@ -40,6 +43,7 @@ export class DisponibilidadesController {
     description: 'Disponibilidades listadas com sucesso.',
   })
   listar(
+    @Req() request: AuthenticatedRequest,
     @Query('agendaId') agendaId?: string,
     @Query('unidadeId') unidadeId?: string,
     @Query('servicoId') servicoId?: string,
@@ -48,6 +52,7 @@ export class DisponibilidadesController {
       agendaId,
       unidadeId,
       servicoId,
+      tenantId: request.user!.tenantId!,
     });
   }
 
@@ -65,8 +70,9 @@ export class DisponibilidadesController {
   })
   buscarPorId(
     @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.disponibilidadesService.buscarPorId(id);
+    return this.disponibilidadesService.buscarPorId(id, request.user!.tenantId!);
   }
 
   @Post()
@@ -84,7 +90,9 @@ export class DisponibilidadesController {
   })
   criar(
     @Body() dto: CriarDisponibilidadeDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.disponibilidadesService.criar(dto);
+    if (request.user!.role === 'RECEPCAO') throw new ForbiddenException('Recepção não pode criar disponibilidades.');
+    return this.disponibilidadesService.criar(dto, request.user!.tenantId!);
   }
 }

@@ -1,5 +1,8 @@
+import type { AuthenticatedRequest } from '../auth/guards/jwt-auth.guard.js';
 
 import {
+  Req,
+  ForbiddenException,
   Controller,
   Get,
   Post,
@@ -40,9 +43,10 @@ export class BloqueiosController {
     description: 'Bloqueios listados com sucesso.',
   })
   listar(
+    @Req() request: AuthenticatedRequest,
     @Query('agendaId') agendaId?: string,
   ) {
-    return this.bloqueiosService.listar(agendaId);
+    return this.bloqueiosService.listar(agendaId, request.user!.tenantId!);
   }
 
   @Get(':id')
@@ -59,8 +63,9 @@ export class BloqueiosController {
   })
   buscarPorId(
     @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.bloqueiosService.buscarPorId(id);
+    return this.bloqueiosService.buscarPorId(id, request.user!.tenantId!);
   }
 
   @Post()
@@ -78,7 +83,9 @@ export class BloqueiosController {
   })
   criar(
     @Body() dto: CriarBloqueioDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.bloqueiosService.criar(dto);
+    if (request.user!.role === 'RECEPCAO') throw new ForbiddenException('Recepção não pode criar bloqueios.');
+    return this.bloqueiosService.criar(dto, request.user!.tenantId!);
   }
 }

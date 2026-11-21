@@ -17,10 +17,11 @@ export class BloqueiosService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async listar(agendaId?: string) {
+  async listar(agendaId?: string, tenantId?: string) {
     return this.prisma.bloqueio.findMany({
       where: {
         ...(agendaId && { agendaId }),
+        ...(tenantId && { agenda: { clinicaId: tenantId } }),
       },
       orderBy: {
         inicio: 'asc',
@@ -28,11 +29,10 @@ export class BloqueiosService {
     });
   }
 
-  async buscarPorId(id: string) {
-    const bloqueio =
-      await this.prisma.bloqueio.findUnique({
-        where: { id },
-      });
+  async buscarPorId(id: string, tenantId?: string) {
+    const bloqueio = tenantId
+      ? await this.prisma.bloqueio.findFirst({ where: { id, agenda: { clinicaId: tenantId } } })
+      : await this.prisma.bloqueio.findUnique({ where: { id } });
 
     if (!bloqueio) {
       throw new NotFoundException(
@@ -43,7 +43,7 @@ export class BloqueiosService {
     return bloqueio;
   }
 
-  async criar(dto: CriarBloqueioDto) {
+  async criar(dto: CriarBloqueioDto, tenantId?: string) {
     const inicio = new Date(dto.inicio);
     const fim = new Date(dto.fim);
 
@@ -86,6 +86,10 @@ export class BloqueiosService {
         throw new NotFoundException(
           'Agenda não encontrada ou inativa.',
         );
+      }
+
+      if (tenantId && agenda.clinicaId !== tenantId) {
+        throw new NotFoundException("Agenda não encontrada nesta clínica.");
       }
 
       // Verifica conflitos com outros bloqueios.

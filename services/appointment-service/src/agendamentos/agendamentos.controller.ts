@@ -1,5 +1,7 @@
+import type { AuthenticatedRequest } from '../auth/guards/jwt-auth.guard.js';
 
 import {
+  Req,
   Controller,
   Get,
   Post,
@@ -41,6 +43,7 @@ export class AgendamentosController {
     description: 'Agendamentos listados com sucesso.',
   })
   listar(
+    @Req() request: AuthenticatedRequest,
     @Query('pacienteId') pacienteId?: string,
     @Query('agendaId') agendaId?: string,
     @Query('status') status?: string,
@@ -49,6 +52,7 @@ export class AgendamentosController {
       pacienteId,
       agendaId,
       status,
+      tenantId: request.user!.tenantId!,
     });
   }
 
@@ -66,8 +70,9 @@ export class AgendamentosController {
   })
   buscarPorId(
     @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.agendamentosService.buscarPorId(id);
+    return this.agendamentosService.buscarPorId(id, request.user!.tenantId!);
   }
 
   @Post()
@@ -85,8 +90,9 @@ export class AgendamentosController {
   })
   criar(
     @Body() dto: CriarAgendamentoDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.agendamentosService.criar(dto);
+    return this.agendamentosService.criar(dto, request.user!.tenantId!);
   }
 
   @Patch(':id/cancelar')
@@ -108,7 +114,8 @@ export class AgendamentosController {
   })
   cancelar(
     @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.agendamentosService.cancelar(id);
+    return this.agendamentosService.cancelar(id, request.user!.tenantId!);
   }
 }

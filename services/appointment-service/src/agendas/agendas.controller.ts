@@ -1,5 +1,7 @@
+import type { AuthenticatedRequest } from '../auth/guards/jwt-auth.guard.js';
 
 import {
+  Req,
   Controller,
   Get,
   Param,
@@ -37,12 +39,14 @@ export class AgendasController {
     description: 'Agendas listadas com sucesso.',
   })
   listar(
+    @Req() request: AuthenticatedRequest,
     @Query('clinicaId') clinicaId?: string,
     @Query('profissionalId') profissionalId?: string,
   ) {
     return this.agendasService.listar({
       clinicaId,
       profissionalId,
+      tenantId: request.user!.tenantId!,
     });
   }
 
@@ -61,7 +65,8 @@ export class AgendasController {
   })
   buscarPorId(
     @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.agendasService.buscarPorId(id);
+    return this.agendasService.buscarPorId(id, request.user!.tenantId!);
   }
 }
