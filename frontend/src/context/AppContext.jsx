@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -41,6 +42,7 @@ const recordToApi = (record, updating = false) => ({
 
 // Os UUIDs fictícios são estáveis entre sessões para a demonstração.
 import { pacientesDemo } from '../data/pacientesDemo';
+import { mapearPacientesRecepcao } from '../data/pacientesCadastrados'; // LUMERA_PACIENTES_RECEPCAO_DEMO_V1
 const nomePacienteDemo = (id) => pacientesDemo.find(p => p.id === id)?.nome || ('Paciente ID ' + String(id).slice(0,8));
 const appointmentFromApi = (a) => ({
   ...a,
@@ -60,6 +62,8 @@ export function AppProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState("");
+  // Converte cadastros RECEPCAO ativos em opcoes para a demonstracao.
+  const pacientes = useMemo(() => mapearPacientesRecepcao(users), [users]);
   // LUMERA_GESTAO_V2
   const [professionals, setProfessionals] = useState([]);
   const [professionalsLoading, setProfessionalsLoading] = useState(false);
@@ -71,6 +75,11 @@ export function AppProvider({ children }) {
   const [disponibilidades, setDisponibilidades] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [appointmentsError, setAppointmentsError] = useState('');
+  // Recupera os nomes reais dos usuarios cadastrados, inclusive apos F5.
+  const appointmentsComPacientes = useMemo(() => appointments.map(a => ({
+    ...a,
+    paciente: pacientes.find(p => p.id === a.pacienteId)?.nome || a.paciente,
+  })), [appointments, pacientes]);
 
   // LUMERA_REAL_PRONTUARIOS_V1 - prontuarios carregados do PostgreSQL pela API.
   const [records, setRecords] = useState([]);
@@ -429,7 +438,7 @@ export function AppProvider({ children }) {
     if (!session?.accessToken) return { ok: false, message: 'Faça login novamente.' };
     const disponivel = disponibilidades.find(d => d.id === form.disponibilidadeId);
     if (!disponivel) return { ok: false, message: 'Selecione uma disponibilidade cadastrada.' };
-    if (!pacientesDemo.some(p => p.id === form.pacienteId)) return { ok: false, message: 'Selecione um paciente fictício.' };
+    if (!pacientes.some(p => p.id === form.pacienteId)) return { ok: false, message: 'Selecione um cadastro ativo com perfil Recepção.' };
     // O MySQL DATETIME não armazena fuso: usamos UTC apenas como formato de transporte,
     // preservando no banco e na tela a hora informada pela clínica.
     const inicio = new Date(form.data + 'T' + form.hora + ':00.000Z');
@@ -533,6 +542,7 @@ export function AppProvider({ children }) {
         login,
         logout,
         users,
+        pacientes,
         createUser,
         updateUser,
         toggleUserActive,
@@ -541,7 +551,7 @@ export function AppProvider({ children }) {
         professionalsError,
         usersLoading,
         usersError,
-        appointments,
+        appointments: appointmentsComPacientes,
         appointmentsLoading,
         appointmentsError,
         agendas,

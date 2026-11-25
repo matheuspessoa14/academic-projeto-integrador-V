@@ -22,7 +22,7 @@ const empty = {
 };
 export default function ProntuariosPage() {
   // LUMERA_REAL_PRONTUARIOS_V1
-  const { records, users, createRecord, updateRecord, recordsLoading, recordsError, professionals, professionalsLoading, professionalsError } = useApp();
+  const { records, pacientes, usersLoading, usersError, createRecord, updateRecord, recordsLoading, recordsError, professionals, professionalsLoading, professionalsError } = useApp();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [q, setQ] = useState("");
@@ -238,22 +238,25 @@ export default function ProntuariosPage() {
         >
           <form className="modal-form" onSubmit={save}>
             {saveError && <p role="alert" style={{ color: "#b42318" }}>{saveError}</p>}
+            {/* LUMERA_PRONTUARIO_PACIENTES_MYSQL_V1: pacientes cadastrados ativos no MySQL, mesma lista de Agendamentos */}
             <label>
-              Paciente
-              <input
+              Paciente (cadastro Recepcao do MySQL)
+              <select
                 required
-                list="record-patients"
                 value={form.paciente}
                 onChange={(e) => setForm({ ...form, paciente: e.target.value })}
-                placeholder="Nome do paciente"
-              />
-              <datalist id="record-patients">
-                {users
-                  .filter((u) => u.role === "PACIENTE")
-                  .map((u) => (
-                    <option key={u.id} value={u.nome} />
-                  ))}
-              </datalist>
+                disabled={saving || usersLoading || !pacientes.length}
+              >
+                <option value="">Selecione um paciente cadastrado</option>
+                {pacientes.map((p) => (
+                  <option key={p.id} value={p.nome}>{p.nome}</option>
+                ))}
+              </select>
+              {usersLoading && <small>Carregando cadastros do MySQL...</small>}
+              {usersError && <small className="form-error">{usersError}</small>}
+              {!usersLoading && !usersError && !pacientes.length && (
+                <small className="form-error">Nenhum cadastro ativo com perfil Recepcao encontrado no MySQL.</small>
+              )}
             </label>
             <div className="form-row">
               <label>

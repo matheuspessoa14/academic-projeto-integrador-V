@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 
 import { randomUUID } from "node:crypto";
+import { publicarAgendamentoCriado } from "../mensageria/rabbitmq.publisher.js";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { CriarAgendamentoDto } from "./dto/criar-agendamento.dto.js";
 
@@ -62,7 +63,7 @@ export class AgendamentosService {
       throw new BadRequestException("O período informado é inválido.");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const criado = await this.prisma.$transaction(async (tx) => {
       // Bloqueia a agenda até o término da transação.
       const agendas = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id
@@ -145,6 +146,20 @@ export class AgendamentosService {
         },
       });
     });
+
+    // LUMERA_RABBITMQ_PW2: publica o evento APOS confirmar o commit no MySQL.
+    // Falhas de mensageria sao registradas sem desfazer o agendamento.
+    await publicarAgendamentoCriado({
+      tipo: "agendamento.criado",
+      agendamentoId: criado.id,
+      agendaId: criado.agendaId,
+      pacienteId: criado.pacienteId,
+      inicio: criado.inicio,
+      fim: criado.fim,
+      clinicaId: tenantId ?? process.env.TENANT_ID,
+      registradoEm: new Date().toISOString(),
+    });
+    return criado;
   }
 
   async cancelar(id: string, tenantId?: string) {

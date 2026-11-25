@@ -5,7 +5,7 @@ import Modal from "../components/Modal";
 import EmptyState from "../components/EmptyState";
 import StatusBadge from "../components/StatusBadge";
 import { brDate, todayISO, initials } from "../utils/format";
-import { pacientesDemo } from "../data/pacientesDemo";
+// LUMERA_PACIENTES_RECEPCAO_DEMO_V1: lista carregada do Auth Service via AppContext
 
 // LUMERA_AGENDAMENTO_REAL_V1 — dados reais no MySQL, nomes de pacientes fictícios.
 const dia = (v) => String(v || "").slice(0, 10);
@@ -13,7 +13,7 @@ const hora = (v) => String(v || "").slice(11, 16);
 
 export default function AgendamentosPage() {
   const {
-    appointments, agendas, disponibilidades, appointmentsLoading,
+    appointments, agendas, disponibilidades, pacientes, usersLoading, usersError, appointmentsLoading,
     appointmentsError, createAppointment, cancelAppointment,
   } = useApp();
   const [q, setQ] = useState("");
@@ -40,7 +40,7 @@ export default function AgendamentosPage() {
     const primeira = disponiveis.find((d) => dia(d.fim) >= todayISO()) || disponiveis[0];
     setSaveError("");
     setForm({
-      pacienteId: pacientesDemo[0]?.id || "",
+      pacienteId: pacientes[0]?.id || "",
       disponibilidadeId: primeira?.id || "",
       data: primeira ? dia(primeira.inicio) : todayISO(),
       hora: primeira ? hora(primeira.inicio) : "09:00",
@@ -145,15 +145,15 @@ export default function AgendamentosPage() {
           </table></div>
         ) : <EmptyState />}
       </section>
-      {modal && <Modal title="Novo agendamento" subtitle="Use apenas pacientes fictícios para esta apresentação acadêmica"
+      {modal && <Modal title="Novo agendamento" subtitle="Selecione um cadastro ativo com perfil Recepção (MySQL)"
         onClose={() => { if (!saving) setModal(false); }}>
         <form className="modal-form" onSubmit={save}>
           {saveError && <p className="form-error" role="alert">{saveError}</p>}
-          <label>Paciente (cadastro fictício de demonstração)
+          <label>Paciente (cadastro Recepção do MySQL)
             <select required value={form.pacienteId} disabled={saving}
               onChange={(e) => setForm({ ...form, pacienteId: e.target.value })}>
               <option value="">Selecione o paciente</option>
-              {pacientesDemo.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+              {pacientes.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
             </select>
           </label>
           <label>Agenda e horário de disponibilidade
@@ -175,11 +175,14 @@ export default function AgendamentosPage() {
                 onChange={(e) => setForm({ ...form, hora: e.target.value })}/>
             </label>
           </div>
-          <p className="form-note">O profissional é aquele vinculado à agenda no banco. A API verifica disponibilidade, bloqueios e conflitos. Os pacientes desta seleção são fictícios; o serviço do grupo ainda não possui cadastro próprio de pacientes.</p>
+          <p className="form-note">O profissional é aquele vinculado à agenda no banco. A API verifica disponibilidade, bloqueios e conflitos. Para esta apresentação, as contas ativas com perfil Recepção são usadas como pacientes. O vínculo é feito por identificador estável; um sistema real precisa de cadastro próprio de pacientes.</p>
           {!disponiveis.length && <p className="form-error" role="alert">Não há agendas ativas com disponibilidades cadastradas no MySQL.</p>}
+          {usersLoading && <p role="status">Carregando cadastros do MySQL...</p>}
+          {usersError && <p className="form-error" role="alert">{usersError}</p>}
+          {!usersLoading && !pacientes.length && <p className="form-error" role="alert">Nenhum usuário ativo com perfil Recepção foi encontrado. Acesse Usuários da equipe e verifique o perfil cadastrado (é necessário estar como administrador).</p>}
           <div className="modal-actions">
             <button type="button" className="secondary-button" disabled={saving} onClick={() => setModal(false)}>Cancelar</button>
-            <button className="primary-button" type="submit" disabled={saving || !disponiveis.length}>
+            <button className="primary-button" type="submit" disabled={saving || !disponiveis.length || !pacientes.length}>
               {saving ? "Salvando..." : "Salvar agendamento"}
             </button>
           </div>

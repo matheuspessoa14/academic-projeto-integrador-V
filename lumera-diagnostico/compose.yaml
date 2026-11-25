@@ -1,0 +1,107 @@
+services:
+  auth-service:
+    build:
+      context: ./services/auth-service
+    image: lumera-auth-service:dev
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env.compose
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+    restart: "no"
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    hostname: lumera-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: lumera
+      RABBITMQ_DEFAULT_PASS: lumera_demo_local_2026
+    ports:
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    restart: "no"
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    image: lumera-notification-service:dev
+    environment:
+      RABBITMQ_URL: amqp://lumera:lumera_demo_local_2026@rabbitmq:5672
+      RABBITMQ_QUEUE: lumera.agendamentos.criados
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: "no"
+
+  appointment-service:
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    build:
+      context: ./services/appointment-service
+    image: lumera-appointment-service:dev
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      TENANT_ID: "00000000-0000-4000-8000-000000000001"
+      RABBITMQ_URL: amqp://lumera:lumera_demo_local_2026@rabbitmq:5672
+      RABBITMQ_QUEUE: lumera.agendamentos.criados
+    ports:
+      - "3002:3000"
+    env_file:
+      - ./services/appointment-service/.env
+    restart: "no"
+
+  gateway:
+    image: nginx:stable-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./gateway/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auth-service
+      - appointment-service
+    restart: "no"
+
+  postgres-prontuario:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: lumera_prontuario
+      POSTGRES_PASSWORD: ${PRONTUARIO_DB_PASSWORD:?Senha nao definida}
+      POSTGRES_DB: lumera_prontuario_dev
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - prontuario_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  prontuario-service:
+    build:
+      context: ./services/prontuario-service
+    image: lumera-prontuario-service:dev
+    ports:
+      - "3003:3000"
+    env_file:
+      - .env.compose
+    environment:
+      TENANT_ID: "00000000-0000-4000-8000-000000000001"
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: "postgresql://lumera_prontuario:${PRONTUARIO_DB_PASSWORD}@postgres-prontuario:5432/lumera_prontuario_dev?schema=public"
+    depends_on:
+      postgres-prontuario:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  prontuario_pgdata:

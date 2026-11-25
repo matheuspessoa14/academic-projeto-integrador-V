@@ -1,0 +1,12 @@
+{
+  "name": "lumera-notification-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.cjs"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.9"
+  }
+}
